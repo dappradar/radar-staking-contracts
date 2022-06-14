@@ -219,6 +219,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
     /// @notice Sets the token per second to be distributed. Can only be called by the owner.
     /// @param _rewardPerSecond The amount of token to be distributed per second.
     function setRewardPerSecond(uint256 _rewardPerSecond) public onlyOwner {
+        updatePool();
         rewardPerSecond = _rewardPerSecond;
         emit LogRewardPerSecond(_rewardPerSecond);
     }
