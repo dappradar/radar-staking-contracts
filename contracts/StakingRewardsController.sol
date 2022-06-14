@@ -100,6 +100,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         UserInfo storage user = userInfo[_user];
         user.amount += _amount;
         user.amountPerChain[_srcChainId] += _amount;
+        user.rewardDebt = user.rewardDebt + (_amount * poolInfo.accToken1PerShare / BASE_UNIT);
 
         emit Staked(_user, _amount, _srcChainId);
     }
@@ -131,7 +132,12 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
             rewardAmount = (user.amount * pool.accToken1PerShare / BASE_UNIT) - user.rewardDebt + user.unpaidRewards;
             user.unpaidRewards = 0;
         }
-        user.rewardDebt = userInfo[_user].amount * pool.accToken1PerShare / BASE_UNIT;
+
+        if (_withdrawalAmount > 0) {
+            user.rewardDebt = 0;
+        } else {
+            user.rewardDebt = userInfo[_user].amount * pool.accToken1PerShare / BASE_UNIT;
+        }
 
         _sendMessage(_user, rewardAmount, _withdrawalAmount, _signature, _dstChain, _dstAddress);
         emit Claimed(_user, rewardAmount, _dstChain);
