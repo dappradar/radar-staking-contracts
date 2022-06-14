@@ -147,10 +147,10 @@ contract StakingRewardsProxy is NonblockingLzApp {
         require(paused == 1, "StakingRewardsProxy: contract is not paused");
         require(balances[msg.sender] > 0, "StakingRewardsProxy: Invalid withdrawal, no deposits done");
 
-        stakingToken.transfer(msg.sender, balances[msg.sender]);
-        emit Withdrawn(msg.sender, balances[msg.sender]);
-
+        uint256 balance = balances[msg.sender];
         balances[msg.sender] = 0;
+        stakingToken.transfer(msg.sender, balance);
+        emit Withdrawn(msg.sender, balance);
     }
 
     function clearQueue(address _user) external onlyOwner {
