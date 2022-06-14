@@ -124,7 +124,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
             require(stakingToken.balanceOf(address(this)) >= withdrawAmount, "StakingRewardsProxy: Insufficient proxy token balance");
 
             stakingToken.transfer(target, withdrawAmount);
-            balances[target] = 0;
+            balances[target] = balances[target] - withdrawAmount;
             emit Withdrawn(target, withdrawAmount);
         }
 
