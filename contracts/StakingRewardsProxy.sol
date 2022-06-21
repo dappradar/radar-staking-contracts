@@ -177,7 +177,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
             require(balances[target] > 0, "StakingRewardsProxy: Invalid withdrawal, no deposits done");
             require(stakingToken.balanceOf(address(this)) >= withdrawAmount, "StakingRewardsProxy: Insufficient proxy token balance");
 
-            stakingToken.transfer(target, withdrawAmount);
+            stakingToken.safeTransfer(target, withdrawAmount);
             balances[target] = balances[target] - withdrawAmount;
             emit Withdrawn(target, withdrawAmount);
         }
@@ -195,6 +195,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
 
     function emergency() external onlyOwner {
         paused = 1;
+        payable(msg.sender).transfer(address(this).balance);
     }
 
     function emergencyWithdraw() external {
@@ -203,7 +204,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
 
         uint256 balance = balances[msg.sender];
         balances[msg.sender] = 0;
-        stakingToken.transfer(msg.sender, balance);
+        stakingToken.safeTransfer(msg.sender, balance);
         emit Withdrawn(msg.sender, balance);
     }
 
@@ -233,4 +234,6 @@ contract StakingRewardsProxy is NonblockingLzApp {
         delete actionInQueue[_user];
         delete signatures[_user];
     }
+
+    receive() external payable {}
 }
