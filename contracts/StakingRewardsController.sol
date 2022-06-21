@@ -141,11 +141,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
             user.unpaidRewards = 0;
         }
 
-        if (_withdrawalAmount > 0) {
-            user.rewardDebt = 0;
-        } else {
-            user.rewardDebt = userInfo[_user].amount * pool.accToken1PerShare / BASE_UNIT;
-        }
+        user.rewardDebt = (userInfo[_user].amount - _withdrawalAmount) * pool.accToken1PerShare / BASE_UNIT;
 
         _sendMessage(_user, rewardAmount, _withdrawalAmount, _signature, _dstChain, _dstAddress);
         emit Claimed(_user, rewardAmount, _dstChain);
