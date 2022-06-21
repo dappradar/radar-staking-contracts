@@ -165,7 +165,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
         uint64 _nonce,
         bytes memory _payload
     ) internal override notPaused {
-        require(nonceRegistry[_nonce] == false, "This nonce was already processed");
+        require(!nonceRegistry[_nonce], "This nonce was already processed");
         nonceRegistry[_nonce] = true;
 
         (address payable target, uint256 rewardAmount, uint256 withdrawAmount, bytes memory signature) = abi.decode(_payload, (address, uint256, uint256, bytes));
