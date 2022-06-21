@@ -112,7 +112,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
     }
 
     function _sendMessage(bytes32 _action, uint256 _amount, bytes memory _signature, uint256 controllerGas) internal {
-        require(address(this).balance > 0, "StakingRewardsProxy: the balance of this contract is 0");
+        require(msg.value > 0, "StakingRewardsProxy: msg.value is 0");
 
         bytes memory payload = abi.encode(msg.sender, _action, _amount, _signature);
 
@@ -233,6 +233,4 @@ contract StakingRewardsProxy is NonblockingLzApp {
         delete actionInQueue[_user];
         delete signatures[_user];
     }
-
-    receive() external payable {}
 }

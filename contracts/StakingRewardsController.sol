@@ -168,7 +168,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
     }
 
     function _sendMessage(address _user, uint256 _rewardAmount, uint256 _withdrawalAmount, bytes memory _signature, uint16 _dstChain, address _dstAddress) internal {
-        require(address(this).balance > 0, "StakingRewardsController: the balance of this contract is 0");
+        require(msg.value > 0, "StakingRewardsController: msg.value is 0");
 
         bytes memory payload = abi.encode(_user, _rewardAmount, _withdrawalAmount, _signature);
 
@@ -186,7 +186,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         // get the fees we need to pay to LayerZero for message delivery
         (uint256 messageFee,) = lzEndpoint.estimateFees(_dstChain, _dstAddress, payload, false, adapterParams);
 
-        require(address(this).balance >= messageFee, "StakingRewardsController: address(this).balance < messageFee. Fund this contract");
+        require(msg.value >= messageFee, "StakingRewardsController: msg.value < messageFee");
 
         _lzSend(// {value: messageFee} will be paid out of this contract!
             _dstChain, // destination chainId
@@ -276,6 +276,4 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
             result := mload(add(source, 32))
         }
     }
-
-    receive() external payable {}
 }
