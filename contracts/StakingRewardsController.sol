@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./interfaces/IStakingRewardsController.sol";
 import "./interfaces/ILayerZeroReceiver.sol";
 import "./interfaces/ILayerZeroUserApplicationConfig.sol";
@@ -17,7 +17,6 @@ import "./LZ/NonBlockingLzApp.sol";
 
 contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController, ReentrancyGuard {
     using ERC165Checker for address;
-    using SignatureChecker for address;
 
     uint256 constant internal BASE_UNIT = 1e18;
     bytes32 constant internal ACTION_STAKE = "stake";
@@ -220,7 +219,9 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
 
         bytes32 amountHashed = keccak256(abi.encodePacked(stringToBytes32(Strings.toString(amount))));
         bytes32 hash = keccak256(abi.encodePacked(action, amountHashed));
-        require(SignatureChecker.isValidSignatureNow(user, hash, signature), "StakingRewardsController: Invalid signature");
+
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash, signature);
+        require(error == ECDSA.RecoverError.NoError && recovered == user, "StakingRewardsController: Invalid signature");
 
         if (action == ACTION_STAKE) {
             _stake(user, amount, _srcChainId);
