@@ -19,7 +19,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
     bytes32 constant internal ACTION_CLAIM = "claim";
 
     uint16 public immutable controllerChainId = 12;
-    uint8 public paused = 0;
+    uint8 public paused;
     address public controller;
     address public fund;
     IERC20 public immutable stakingToken;
