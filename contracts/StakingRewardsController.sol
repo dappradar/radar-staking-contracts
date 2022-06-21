@@ -211,7 +211,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         uint64 _nonce,
         bytes memory _payload
     ) internal override {
-        require(nonceRegistry[_nonce] == false, "This nonce was already processed");
+        require(!nonceRegistry[_nonce], "This nonce was already processed");
         nonceRegistry[_nonce] = true;
 
         // use assembly to extract the address from the bytes memory parameter
