@@ -63,7 +63,6 @@ contract StakingRewardsProxy is NonblockingLzApp {
         fund = _fund;
         stakingToken = IERC20(_stakingToken);
 
-        gasAmounts = GasAmounts(0, 0, 0, 0, 0);
         gasAmounts.proxyWithdraw = 260000;
         gasAmounts.proxyClaim = 240000;
         gasAmounts.controllerStake = 280000;

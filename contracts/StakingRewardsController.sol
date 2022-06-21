@@ -46,7 +46,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         uint256 unpaidRewards;
     }
 
-    PoolInfo public poolInfo = PoolInfo(0, 0);
+    PoolInfo public poolInfo;
     GasAmounts public gasAmounts;
     mapping(uint64 => bool) private nonceRegistry;
 
@@ -69,7 +69,6 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         transferOwnership(_owner);
         rewardPerSecond = _rewardPerSecond;
 
-        gasAmounts = GasAmounts(0, 0);
         gasAmounts.proxyWithdraw = 260000;
         gasAmounts.proxyClaim = 240000;
     }
