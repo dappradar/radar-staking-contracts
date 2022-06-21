@@ -19,7 +19,7 @@ abstract contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicatio
         lzEndpoint = ILayerZeroEndpoint(_endpoint);
     }
 
-    function lzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) external override {
+    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64 _nonce, bytes calldata _payload) external override {
         // lzReceive must be called by the endpoint for security
         require(_msgSender() == address(lzEndpoint));
         // if will still block the message pathway from (srcChainId, srcAddress). should not receive message from untrusted remote.
