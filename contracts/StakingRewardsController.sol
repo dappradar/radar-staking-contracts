@@ -27,7 +27,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
 
     uint256 public rewardPerSecond;
     uint256 public override totalSupply;
-    mapping(uint16 => uint256) supplyPerChain;
+    mapping(uint16 => uint256) public supplyPerChain;
 
     struct GasAmounts {
         uint256 proxyWithdraw;
