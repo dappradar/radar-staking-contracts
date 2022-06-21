@@ -12,7 +12,6 @@ import "./interfaces/IStakingRewardsController.sol";
 import "./interfaces/ILayerZeroReceiver.sol";
 import "./interfaces/ILayerZeroUserApplicationConfig.sol";
 import "./interfaces/ILayerZeroEndpoint.sol";
-import "hardhat/console.sol";
 import "./LZ/LzApp.sol";
 import "./LZ/NonBlockingLzApp.sol";
 
@@ -30,6 +29,11 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
     uint256 public override totalSupply;
     mapping(uint16 => uint256) supplyPerChain;
 
+    struct GasAmounts {
+        uint256 proxyWithdraw;
+        uint256 proxyClaim;
+    }
+
     struct PoolInfo {
         uint256 accToken1PerShare;
         uint256 lastRewardTime;
@@ -43,9 +47,10 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
     }
 
     PoolInfo public poolInfo = PoolInfo(0, 0);
+    GasAmounts public gasAmounts;
     mapping(uint64 => bool) private nonceRegistry;
 
-    mapping (address => UserInfo) public userInfo;
+    mapping(address => UserInfo) public userInfo;
 
     /************** events ***************/
     event Staked(address indexed user, uint256 amount, uint16 indexed chainId);
@@ -63,6 +68,10 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
     ) ReentrancyGuard() NonblockingLzApp(_endpoint) {
         transferOwnership(_owner);
         rewardPerSecond = _rewardPerSecond;
+
+        gasAmounts = GasAmounts(0, 0);
+        gasAmounts.proxyWithdraw = 260000;
+        gasAmounts.proxyClaim = 240000;
     }
 
     /************** views ***************/
@@ -143,6 +152,27 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         emit Claimed(_user, rewardAmount, _dstChain);
     }
 
+    function getAdapterParams(bytes32 _action) internal view returns (bytes memory adapterParams) {
+        uint16 version = 1;
+        uint256 gasForDestinationLzReceive;
+        if (_action == ACTION_CLAIM) {
+            gasForDestinationLzReceive = gasAmounts.proxyClaim;
+        } else if (_action == ACTION_WITHDRAW) {
+            gasForDestinationLzReceive = gasAmounts.proxyWithdraw;
+        }
+        require(gasForDestinationLzReceive > 0, "StakingRewardsController: unable to estimate gas fee");
+
+        adapterParams = abi.encodePacked(version, gasForDestinationLzReceive);
+    }
+
+    function estimateFees(uint16 _dstChainId, address _dstAddress, bytes32 _action, uint256 _rewardAmount, uint256 _withdrawalAmount, bytes memory _signature) public view returns (uint256 messageFee){
+        bytes memory adapterParams = getAdapterParams(_action);
+
+        bytes memory payload = abi.encode(msg.sender, _rewardAmount, _withdrawalAmount, _signature);
+        // get the fees we need to pay to LayerZero for message delivery
+        (messageFee,) = lzEndpoint.estimateFees(_dstChainId, _dstAddress, payload, false, adapterParams);
+    }
+
     function _sendMessage(address _user, uint256 _rewardAmount, uint256 _withdrawalAmount, bytes memory _signature, uint16 _dstChain, address _dstAddress) internal {
         require(address(this).balance > 0, "StakingRewardsController: the balance of this contract is 0");
 
@@ -150,18 +180,24 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
 
         // use adapterParams v1 to specify more gas for the destination
         uint16 version = 1;
-        uint256 gasForDestinationLzReceive = 250000;
+        uint256 gasForDestinationLzReceive;
+        if (_withdrawalAmount > 0) {
+            gasForDestinationLzReceive = gasAmounts.proxyWithdraw;
+        } else {
+            gasForDestinationLzReceive = gasAmounts.proxyClaim;
+        }
+
         bytes memory adapterParams = abi.encodePacked(version, gasForDestinationLzReceive);
 
         // get the fees we need to pay to LayerZero for message delivery
-        (uint256 messageFee, ) = lzEndpoint.estimateFees(_dstChain, address(this), payload, false, adapterParams);
+        (uint256 messageFee,) = lzEndpoint.estimateFees(_dstChain, _dstAddress, payload, false, adapterParams);
 
         require(address(this).balance >= messageFee, "StakingRewardsController: address(this).balance < messageFee. Fund this contract");
 
-        _lzSend( // {value: messageFee} will be paid out of this contract!
+        _lzSend(// {value: messageFee} will be paid out of this contract!
             _dstChain, // destination chainId
             payload, // abi.encode()'ed bytes
-            payable(address(this)), // refund address (LayerZero will refund any extra gas)
+            payable(_user), // refund address (LayerZero will refund any extra gas)
             address(0x0), // future param, unused for this example
             adapterParams // v1 adapterParams, specify custom destination gas qty
         );
@@ -222,6 +258,16 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         updatePool();
         rewardPerSecond = _rewardPerSecond;
         emit LogRewardPerSecond(_rewardPerSecond);
+    }
+
+    function setGasAmounts(uint256 _proxyWithdraw, uint256 _proxyClaim) public onlyOwner {
+        if (_proxyWithdraw > 0) {
+            gasAmounts.proxyWithdraw = _proxyWithdraw;
+        }
+
+        if (_proxyClaim > 0) {
+            gasAmounts.proxyClaim = _proxyClaim;
+        }
     }
 
     function stringToBytes32(string memory source) public pure returns (bytes32 result) {
