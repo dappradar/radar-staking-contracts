@@ -230,10 +230,5 @@ contract StakingRewardsProxy is NonblockingLzApp {
         }
     }
 
-    function clearQueue(address _user) external onlyOwner {
-        delete actionInQueue[_user];
-        delete signatures[_user];
-    }
-
     receive() external payable {}
 }
