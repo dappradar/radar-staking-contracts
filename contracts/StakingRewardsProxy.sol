@@ -38,6 +38,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
     mapping(address => bytes) public signatures;
     mapping(address => uint256) public balances;
 
+    event StakeInitiated(address indexed user, uint256 amount);
     event WithdrawalInitiated(address indexed user);
     event ClaimInitiated(address indexed user);
 
@@ -138,6 +139,7 @@ contract StakingRewardsProxy is NonblockingLzApp {
         balances[msg.sender] += _amount;
 
         uint256 controllerGas = 0;
+        emit StakeInitiated(msg.sender, _amount);
         _sendMessage(ACTION_STAKE, _amount, _signature, controllerGas);
     }
 

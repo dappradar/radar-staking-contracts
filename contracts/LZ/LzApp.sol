@@ -37,6 +37,11 @@ abstract contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicatio
         lzEndpoint.send{value: msg.value}(_dstChainId, trustedRemote, _payload, _refundAddress, _zroPaymentAddress, _adapterParams);
     }
 
+    function _lzSendWithCustomValue(uint256 messageFee, uint16 _dstChainId, bytes memory _payload, address payable _refundAddress, address _zroPaymentAddress, bytes memory _adapterParams) internal virtual {
+        bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
+        require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
+        lzEndpoint.send{value: messageFee}(_dstChainId, trustedRemote, _payload, _refundAddress, _zroPaymentAddress, _adapterParams);
+    }
     //---------------------------UserApplication config----------------------------------------
     function getConfig(uint16, uint16 _chainId, address, uint _configType) external view returns (bytes memory) {
         return lzEndpoint.getConfig(lzEndpoint.getSendVersion(address(this)), _chainId, address(this), _configType);

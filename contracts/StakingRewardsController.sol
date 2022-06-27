@@ -188,7 +188,8 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
 
         require(address(this).balance >= messageFee, "StakingRewardsController: address(this).balance < messageFee");
 
-        _lzSend(// {value: messageFee} will be paid out of this contract!
+        _lzSendWithCustomValue(// {value: messageFee} will be paid out of this contract!
+            messageFee,
             _dstChain, // destination chainId
             payload, // abi.encode()'ed bytes
             payable(_user), // refund address (LayerZero will refund any extra gas)
