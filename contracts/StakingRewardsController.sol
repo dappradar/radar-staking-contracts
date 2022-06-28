@@ -47,7 +47,7 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
 
     PoolInfo public poolInfo;
     GasAmounts public gasAmounts;
-    mapping(uint64 => bool) private nonceRegistry;
+    mapping (uint16 => mapping(uint64 => bool)) private nonceRegistry;
 
     mapping(address => UserInfo) public userInfo;
 
@@ -206,8 +206,8 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         uint64 _nonce,
         bytes memory _payload
     ) internal override {
-        require(!nonceRegistry[_nonce], "This nonce was already processed");
-        nonceRegistry[_nonce] = true;
+        require(!nonceRegistry[_srcChainId][_nonce], "This nonce was already processed");
+        nonceRegistry[_srcChainId][_nonce] = true;
 
         // use assembly to extract the address from the bytes memory parameter
         address sendBackToAddress;
