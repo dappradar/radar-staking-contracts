@@ -55,7 +55,8 @@ contract StakingRewardsProxy is NonblockingLzApp {
         _;
     }
 
-    constructor(address _endpoint, address _fund, address _controller, address _stakingToken) NonblockingLzApp(_endpoint) {
+    constructor(address _owner, address _endpoint, address _fund, address _controller, address _stakingToken) NonblockingLzApp(_endpoint) {
+        transferOwnership(_owner);
         require(_controller != address(0), "RadarStakingProxy: invalid controller address");
         require(_stakingToken != address(0), "RadarStakingProxy: invalid staking token address");
         require(_fund != address(0), "RadarStakingProxy: invalid fund address");
@@ -197,7 +198,9 @@ contract StakingRewardsProxy is NonblockingLzApp {
 
     function emergency() external onlyOwner {
         paused = 1;
-        payable(msg.sender).transfer(address(this).balance);
+
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "StakingRewardsProxy: unable to send value, recipient may have reverted");
     }
 
     function emergencyWithdraw() external {

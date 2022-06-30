@@ -278,5 +278,10 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         }
     }
 
+    function withdraw() external onlyOwner {
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "StakingRewardsController: unable to send value, recipient may have reverted");
+    }
+
     receive() external payable {}
 }
