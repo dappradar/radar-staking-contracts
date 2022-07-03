@@ -4,6 +4,8 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interfaces/ILayerZeroReceiver.sol";
 import "./interfaces/ILayerZeroUserApplicationConfig.sol";
 import "./interfaces/ILayerZeroEndpoint.sol";
@@ -115,6 +117,12 @@ contract StakingRewardsProxy is NonblockingLzApp {
 
     function _sendMessage(bytes32 _action, uint256 _amount, bytes memory _signature, uint256 controllerGas) internal {
         require(msg.value > 0, "StakingRewardsProxy: msg.value is 0");
+
+        bytes32 amountHashed = keccak256(abi.encodePacked(stringToBytes32(Strings.toString(_amount))));
+        bytes32 hash = keccak256(abi.encodePacked(_action, amountHashed));
+
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash, _signature);
+        require(error == ECDSA.RecoverError.NoError && recovered == msg.sender, "StakingRewardsProxy: Invalid signature");
 
         bytes memory payload = abi.encode(msg.sender, _action, _amount, _signature);
 
@@ -232,6 +240,17 @@ contract StakingRewardsProxy is NonblockingLzApp {
 
         if (_controllerClaim > 0) {
             gasAmounts.controllerClaim = _controllerClaim;
+        }
+    }
+
+    function stringToBytes32(string memory source) public pure returns (bytes32 result) {
+        bytes memory tempEmptyStringTest = bytes(source);
+        if (tempEmptyStringTest.length == 0) {
+            return 0x0;
+        }
+
+        assembly {
+            result := mload(add(source, 32))
         }
     }
 
