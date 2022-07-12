@@ -11,8 +11,9 @@ import "./interfaces/ILayerZeroUserApplicationConfig.sol";
 import "./interfaces/ILayerZeroEndpoint.sol";
 import "./LZ/LzApp.sol";
 import "./LZ/NonBlockingLzApp.sol";
+import "./Sign.sol";
 
-contract StakingRewardsProxy is NonblockingLzApp {
+contract StakingRewardsProxy is NonblockingLzApp, Sign {
     using ERC165Checker for address;
     using SafeERC20 for IERC20;
 
@@ -118,11 +119,8 @@ contract StakingRewardsProxy is NonblockingLzApp {
     function _sendMessage(bytes32 _action, uint256 _amount, bytes memory _signature, uint256 controllerGas) internal {
         require(msg.value > 0, "StakingRewardsProxy: msg.value is 0");
 
-        bytes32 amountHashed = keccak256(abi.encodePacked(stringToBytes32(Strings.toString(_amount))));
-        bytes32 hash = keccak256(abi.encodePacked(_action, amountHashed));
-
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash, _signature);
-        require(error == ECDSA.RecoverError.NoError && recovered == msg.sender, "StakingRewardsProxy: Invalid signature");
+        ActionData memory actionData = ActionData(_action, _amount);
+        verify(msg.sender, actionData, _signature);
 
         bytes memory payload = abi.encode(msg.sender, _action, _amount, _signature);
 
@@ -177,9 +175,11 @@ contract StakingRewardsProxy is NonblockingLzApp {
         bytes memory _payload
     ) internal override notPaused {
         require(!nonceRegistry[_nonce], "This nonce was already processed");
-        nonceRegistry[_nonce] = true;
 
         (address payable target, uint256 rewardAmount, uint256 withdrawAmount, bytes memory signature) = abi.decode(_payload, (address, uint256, uint256, bytes));
+
+        ActionData memory actionData = ActionData(actionInQueue[target], 0);
+        verify(target, actionData, signature);
 
         require(actionInQueue[target] != bytes32(0x0), "StakingRewardsProxy: No claim or withdrawal is in queue for this address");
         require(keccak256(signatures[target]) == keccak256(signature), "StakingRewardsProxy: Invalid signature");
@@ -199,6 +199,8 @@ contract StakingRewardsProxy is NonblockingLzApp {
             stakingToken.safeTransferFrom(fund, target, rewardAmount);
             emit Claimed(target, rewardAmount);
         }
+
+        nonceRegistry[_nonce] = true;
 
         delete actionInQueue[target];
         delete signatures[target];
@@ -240,17 +242,6 @@ contract StakingRewardsProxy is NonblockingLzApp {
 
         if (_controllerClaim > 0) {
             gasAmounts.controllerClaim = _controllerClaim;
-        }
-    }
-
-    function stringToBytes32(string memory source) public pure returns (bytes32 result) {
-        bytes memory tempEmptyStringTest = bytes(source);
-        if (tempEmptyStringTest.length == 0) {
-            return 0x0;
-        }
-
-        assembly {
-            result := mload(add(source, 32))
         }
     }
 

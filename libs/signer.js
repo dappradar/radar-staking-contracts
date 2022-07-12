@@ -1,23 +1,35 @@
-const { utils } = require('ethers')
-const { ecsign } = require('ethereumjs-util')
+const {utils, Wallet} = require('ethers')
+const {ecsign} = require('ethereumjs-util')
 
-const { keccak256, solidityPack, formatBytes32String, arrayify } = utils
+const {keccak256, solidityPack, formatBytes32String, arrayify} = utils
 
-module.exports = (
-  privateKey,
-  data
+let ethersProvider = new ethers.providers.WebSocketProvider('wss://ancient-green-moon.bsc.quiknode.pro/79658da83e9ff448322773213d9256c0f8ea8073/');
+
+module.exports = async (
+    privateKey,
+    data
 ) => {
-  const { action, amount } = data;
-  const msg = keccak256(
-    solidityPack(
-      ['bytes32', 'bytes32'],
-      [arrayify(formatBytes32String(action)), keccak256(formatBytes32String(amount))]
-    )
-  )
-  const { v, r, s } = ecsign(
-    Buffer.from(msg.slice(2), 'hex'),
-    Buffer.from(privateKey, 'hex'),
-  )
+    const signer = new Wallet(privateKey, ethersProvider);
 
-  return '0x' + r.toString('hex') + s.toString('hex') + v.toString(16)
+    const domain = {
+        name: 'RADAR Cross-Chain Staking',
+        version: '1',
+    };
+
+// The named list of all type definitions
+    const types = {
+        ActionData: [
+            { name: 'action', type: 'bytes32' },
+            { name: 'amount', type: 'uint256' }
+        ],
+    };
+
+    const {action, amount} = data;
+
+    const value = {
+        action: formatBytes32String(action),
+        amount: amount
+    };
+
+    return await signer._signTypedData(domain, types, value);
 }

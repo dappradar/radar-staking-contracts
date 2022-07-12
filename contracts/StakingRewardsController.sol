@@ -14,8 +14,9 @@ import "./interfaces/ILayerZeroUserApplicationConfig.sol";
 import "./interfaces/ILayerZeroEndpoint.sol";
 import "./LZ/LzApp.sol";
 import "./LZ/NonBlockingLzApp.sol";
+import "./Sign.sol";
 
-contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController, ReentrancyGuard {
+contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController, ReentrancyGuard, Sign {
     using ERC165Checker for address;
 
     uint256 constant internal BASE_UNIT = 1e18;
@@ -218,11 +219,8 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         (address user, bytes32 action, uint256 amount, bytes memory signature) = abi.decode(_payload, (address, bytes32, uint256, bytes));
         require(action == ACTION_STAKE || action == ACTION_WITHDRAW || action == ACTION_CLAIM, "StakingRewardsController: Invalid action");
 
-        bytes32 amountHashed = keccak256(abi.encodePacked(stringToBytes32(Strings.toString(amount))));
-        bytes32 hash = keccak256(abi.encodePacked(action, amountHashed));
-
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash, signature);
-        require(error == ECDSA.RecoverError.NoError && recovered == user, "StakingRewardsController: Invalid signature");
+        ActionData memory actionData = ActionData(action, amount);
+        verify(user, actionData, signature);
 
         if (action == ACTION_STAKE) {
             _stake(user, amount, _srcChainId);
@@ -264,17 +262,6 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
 
         if (_proxyClaim > 0) {
             gasAmounts.proxyClaim = _proxyClaim;
-        }
-    }
-
-    function stringToBytes32(string memory source) public pure returns (bytes32 result) {
-        bytes memory tempEmptyStringTest = bytes(source);
-        if (tempEmptyStringTest.length == 0) {
-            return 0x0;
-        }
-
-        assembly {
-            result := mload(add(source, 32))
         }
     }
 

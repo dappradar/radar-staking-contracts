@@ -1,7 +1,7 @@
 const {expect} = require("chai");
 const {ethers} = require("hardhat");
-const { keccak256 } = require("@ethersproject/keccak256");
-const { toUtf8Bytes } = require("@ethersproject/strings");
+const {keccak256} = require("@ethersproject/keccak256");
+const {toUtf8Bytes} = require("@ethersproject/strings");
 const privateKey = require("./privateKey");
 const signer = require("../libs/signer");
 
@@ -12,11 +12,12 @@ function increaseTime(seconds) {
 
 console.log('Test staking rewards LZ');
 
-const srcChainId = 10006; // polygon mumbai testnet
-const dstChainId = 10012; // bsc testnet
+const srcChainId = 2; // bsc
+const dstChainId = 12; // fantom
 
 const tenTokens = ethers.utils.parseEther("10").toString();
 const hundredTokens = ethers.utils.parseEther("100").toString();
+const millionTokens = ethers.utils.parseEther("1000000").toString();
 
 describe.only("Staking Rewards", () => {
     beforeEach(async () => {
@@ -30,9 +31,9 @@ describe.only("Staking Rewards", () => {
         const MockERC20 = await ethers.getContractFactory("MockERC20");
 
         rewardsToken = await MockERC20.deploy(owner.address);
-        await rewardsToken.mint(owner.address, hundredTokens);
+        await rewardsToken.mint(owner.address, millionTokens);
         await rewardsToken.mint(alice.address, hundredTokens);
-        await rewardsToken.mint(bob.address, hundredTokens);
+        await rewardsToken.mint(bob.address, millionTokens);
 
         const LZEndpointMock = await ethers.getContractFactory("LZEndpointMock");
         lzEndpointMockSrc = await LZEndpointMock.deploy(srcChainId);
@@ -44,7 +45,7 @@ describe.only("Staking Rewards", () => {
 
         stakingRewardsController = await StakingRewardsController.deploy(
             owner.address,
-            10, //rewardPerSecond
+            "10000000000000000", //rewardPerSecond
             lzEndpointMockDst.address
         );
         console.log('Controller address: ' + stakingRewardsController.address);
@@ -53,6 +54,7 @@ describe.only("Staking Rewards", () => {
             "StakingRewardsProxy"
         );
         stakingRewardsProxy = await StakingRewardsProxy.deploy(
+            owner.address,
             lzEndpointMockSrc.address,
             bob.address,
             stakingRewardsController.address,
@@ -60,7 +62,7 @@ describe.only("Staking Rewards", () => {
         );
         console.log('proxy address: ' + stakingRewardsProxy.address);
 
-        await rewardsToken.connect(bob).approve(stakingRewardsProxy.address, tenTokens);
+        await rewardsToken.connect(bob).approve(stakingRewardsProxy.address, millionTokens);
 
         // Fund with some eth to be able to pay for layer zero calls
         await owner.sendTransaction({
@@ -95,54 +97,55 @@ describe.only("Staking Rewards", () => {
     });
 
     describe("Test staking through LayerZero", () => {
-        it("fund rewards", async () => {
-            // Stake & wait 1 day
-            await rewardsToken.connect(alice).approve(stakingRewardsProxy.address, tenTokens);
-            let signature = signer(alice.privateKey, {action: 'stake', amount: tenTokens}); // 10**11
-            await stakingRewardsController.connect(owner).setRewardPerSecond(10);
-            await stakingRewardsProxy.connect(alice).stake(tenTokens, signature);
+        it("Stake once", async () => {
+            await rewardsToken.connect(owner).approve(stakingRewardsProxy.address, tenTokens);
 
-            expect(await rewardsToken.balanceOf(stakingRewardsProxy.address)).to.equal("10000000000000000000");
+            expect(await rewardsToken.balanceOf(alice.address)).to.equal(toWei("100"));
+            await stake(alice, tenTokens);
+            expect(await getBalanceOf(alice)).to.equal(tenTokens);
+            expect(await rewardsToken.balanceOf(alice.address)).to.equal(toWei("90"));
+        });
 
-            increaseTime(60 * 60 * 24); // increase time by 1 day
-            expect(await stakingRewardsController.pendingRewards(alice.address)).to.equal(864000);
+        it("Stake and withdraw", async () => {
+            await stake(alice, tenTokens);
+            expect(await getBalanceOf(alice)).to.equal(tenTokens);
 
-            // Double rewardPerSecond, wait 1 day and check pending rewards (should have 3x rewards now)
-            await stakingRewardsController.updatePool(); //hit updatePool before updating rewardPerSecond to not skew rewards
-            await stakingRewardsController.connect(owner).setRewardPerSecond(20);
-
-            increaseTime(60 * 60 * 24);
-            expect(await stakingRewardsController.pendingRewards(alice.address)).to.equal(2592030);
-
-            // Stake more to check if cumulative staking works well
-            await rewardsToken.connect(alice).approve(stakingRewardsProxy.address, tenTokens);
-            signature = signer(alice.privateKey, {action: 'stake', amount: tenTokens});
-            await stakingRewardsProxy.connect(alice).stake(tenTokens, signature);
-
-            increaseTime(60 * 60 * 24);
-            expect(await stakingRewardsController.pendingRewards(alice.address)).to.equal("6912140");
-
-            // Claim rewards
-            signature = signer(alice.privateKey, {action: 'claim', amount: "0"});
-            await stakingRewardsProxy.connect(alice).claim(signature);
-            expect(await rewardsToken.balanceOf(alice.address)).to.equal("80000000000006912160");
-            expect(await rewardsToken.balanceOf(stakingRewardsProxy.address)).to.equal("20000000000000000000");
-            expect(await stakingRewardsController.pendingRewards(alice.address)).to.equal(0);
-
-            // Withdraw stake
-            signature = signer(alice.privateKey, {action: 'withdraw', amount: "0"});
-            await stakingRewardsProxy.connect(alice).withdraw(signature);
-            expect(await rewardsToken.balanceOf(alice.address)).to.equal("100000000000006912180");
-
-            // Emergency withdraw
-            await rewardsToken.connect(alice).approve(stakingRewardsProxy.address, tenTokens);
-            signature = signer(alice.privateKey, {action: 'stake', amount: tenTokens});
-            await stakingRewardsProxy.connect(alice).stake(tenTokens, signature);
-            expect(await rewardsToken.balanceOf(stakingRewardsProxy.address)).to.equal(tenTokens);
-            await stakingRewardsProxy.connect(owner).emergency();
-            await stakingRewardsProxy.connect(alice).emergencyWithdraw();
-            expect(await rewardsToken.balanceOf(stakingRewardsProxy.address)).to.equal("0");
-            expect(await rewardsToken.balanceOf(alice.address)).to.equal("100000000000006912180");
+            await withdraw(alice);
+            expect(await getBalanceOf(alice)).to.equal(0);
+            expect(await rewardsToken.balanceOf(alice.address)).to.equal(toWei("100.01"));
         });
     });
+
+    async function stake(user, amount) {
+        await rewardsToken.connect(user).approve(stakingRewardsProxy.address, amount);
+        let signature = await signer(user.privateKey, {action: "stake", amount: amount}); // 10**11
+
+        await stakingRewardsProxy.connect(user).stake(amount, signature, {value: ethers.utils.parseEther("1").toString()});
+    }
+
+    async function claim(user) {
+        let signature = await signer(user.privateKey, {action: 'claim', amount: "0"}); // 10**11
+        await stakingRewardsProxy.connect(user).claim(signature, "0", {value: ethers.utils.parseEther("1").toString()});
+    }
+
+    async function withdraw(user) {
+        let signature = await signer(user.privateKey, {action: 'withdraw', amount: "0"}); // 10**11
+        await stakingRewardsProxy.connect(user).withdraw(signature, "0", {value: ethers.utils.parseEther("1").toString()});
+    }
+
+    async function getPendingRewards(user) {
+        return parseFloat(ethers.utils.formatEther(await stakingRewardsController.pendingRewards(user.address))).toFixed(2);
+    }
+
+    async function getBalanceOf(user) {
+        return await stakingRewardsController["balanceOf(address)"](user.address);
+    }
+
+    function toEther(wei) {
+        return ethers.utils.formatEther(wei);
+    }
+
+    function toWei(ether) {
+        return ethers.utils.parseEther(ether);
+    }
 });
