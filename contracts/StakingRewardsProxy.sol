@@ -119,8 +119,13 @@ contract StakingRewardsProxy is NonblockingLzApp, Sign {
     function _sendMessage(bytes32 _action, uint256 _amount, bytes memory _signature, uint256 controllerGas) internal {
         require(msg.value > 0, "StakingRewardsProxy: msg.value is 0");
 
-        ActionData memory actionData = ActionData(_action, _amount);
-        verify(msg.sender, actionData, _signature);
+        if (_action == ACTION_STAKE) {
+            StakeData memory actionData = StakeData(bytes32ToString(_action), _amount);
+            verify(msg.sender, actionData, _signature);
+        } else {
+            ClaimWithdrawData memory actionData = ClaimWithdrawData(bytes32ToString(_action));
+            verify(msg.sender, actionData, _signature);
+        }
 
         bytes memory payload = abi.encode(msg.sender, _action, _amount, _signature);
 
@@ -178,7 +183,7 @@ contract StakingRewardsProxy is NonblockingLzApp, Sign {
 
         (address payable target, uint256 rewardAmount, uint256 withdrawAmount, bytes memory signature) = abi.decode(_payload, (address, uint256, uint256, bytes));
 
-        ActionData memory actionData = ActionData(actionInQueue[target], 0);
+        ClaimWithdrawData memory actionData = ClaimWithdrawData(bytes32ToString(actionInQueue[target]));
         verify(target, actionData, signature);
 
         require(actionInQueue[target] != bytes32(0x0), "StakingRewardsProxy: No claim or withdrawal is in queue for this address");

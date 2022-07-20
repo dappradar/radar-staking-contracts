@@ -219,8 +219,13 @@ contract StakingRewardsController is NonblockingLzApp, IStakingRewardsController
         (address user, bytes32 action, uint256 amount, bytes memory signature) = abi.decode(_payload, (address, bytes32, uint256, bytes));
         require(action == ACTION_STAKE || action == ACTION_WITHDRAW || action == ACTION_CLAIM, "StakingRewardsController: Invalid action");
 
-        ActionData memory actionData = ActionData(action, amount);
-        verify(user, actionData, signature);
+        if (action == ACTION_STAKE) {
+            StakeData memory actionData = StakeData(bytes32ToString(action), amount);
+            verify(user, actionData, signature);
+        } else {
+            ClaimWithdrawData memory actionData = ClaimWithdrawData(bytes32ToString(action));
+            verify(user, actionData, signature);
+        }
 
         if (action == ACTION_STAKE) {
             _stake(user, amount, _srcChainId);
